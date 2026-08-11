@@ -4,6 +4,7 @@ on:
   pull_request:
   push:
     branches:
+      - master
       - main
 
 # Cancel in-progress runs for the same branch/PR to avoid wasting CI minutes.
@@ -29,6 +30,9 @@ jobs:
 
       - name: Run lint
         run: npm run lint
+
+      - name: Run tests
+        run: npm test
 
       - name: Run build
         run: npm run build
