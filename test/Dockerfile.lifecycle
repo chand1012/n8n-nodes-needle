@@ -1,0 +1,8 @@
+FROM n8nio/n8n:latest
+
+USER root
+RUN mkdir -p /home/node/.n8n/nodes && chown -R node:node /home/node/.n8n
+COPY n8n-nodes-needle-0.1.0.tgz /tmp/n8n-nodes-needle.tgz
+
+USER node
+RUN cd /home/node/.n8n/nodes && npm init -y && npm install /tmp/n8n-nodes-needle.tgz --omit=dev --ignore-scripts --no-audit --no-fund

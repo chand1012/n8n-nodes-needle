@@ -21,5 +21,11 @@
 		"skipLibCheck": true,
 		"outDir": "./dist/"
 	},
-	"include": ["credentials/**/*", "nodes/**/*", "nodes/**/*.json", "package.json"]
+	"include": [
+		"langchain/**/*",
+		"nodes/**/*",
+		"nodes/**/*.json",
+		"runtime/**/*",
+		"package.json"
+	]
 }
