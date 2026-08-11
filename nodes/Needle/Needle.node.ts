@@ -1,3 +1,4 @@
+/* eslint-disable @n8n/community-nodes/node-usable-as-tool -- This is intentionally a standalone workflow node. */
 import type {
 	IExecuteFunctions,
 	INodeExecutionData,
@@ -27,12 +28,11 @@ export class Needle implements INodeType {
 		icon: 'file:needle.svg',
 		group: ['transform'],
 		version: 1,
-		description: 'Run local Needle 2 tool selection and structured extraction',
+		description: 'Run Needle 2 locally as a standalone workflow step',
 		subtitle: '={{$parameter["operation"]}}',
 		defaults: { name: 'Needle' },
 		inputs: [NodeConnectionTypes.Main],
 		outputs: [NodeConnectionTypes.Main],
-		usableAsTool: true,
 		properties: [
 			{
 				displayName: 'Operation',
@@ -42,8 +42,8 @@ export class Needle implements INodeType {
 				options: [
 					{ name: 'Classification', value: 'classification', description: 'Choose a label from a fixed list', action: 'Classify text' },
 					{ name: 'Complete', value: 'complete', description: 'Call the underlying Needle completion interface', action: 'Complete a prompt' },
+					{ name: 'Function Call Selection', value: 'toolSelection', description: 'Return one or more function names and arguments to the main workflow output', action: 'Select function calls' },
 					{ name: 'Structured Extraction', value: 'structuredExtraction', description: 'Extract data constrained by JSON Schema', action: 'Extract structured data' },
-					{ name: 'Tool Selection', value: 'toolSelection', description: 'Choose one or more tools and arguments', action: 'Select tools' },
 				],
 				default: 'toolSelection',
 			},
@@ -75,11 +75,11 @@ export class Needle implements INodeType {
 				required: true,
 			},
 			{
-				displayName: 'Tools (JSON)',
+				displayName: 'Functions (JSON)',
 				name: 'tools',
 				type: 'json',
 				default: '[]',
-				description: 'Array of OpenAI-style tools with name, description, and JSON Schema parameters',
+				description: 'Functions Needle may call. Provide a JSON array where each function has a name, optional description, and a JSON Schema parameters object. Selected calls are returned in functionCalls on the main output.',
 				displayOptions: { show: { operation: ['toolSelection', 'complete'] } },
 			},
 			{
@@ -221,22 +221,28 @@ function buildTools(
 			},
 		}];
 	}
-	return parseTools(context.getNodeParameter('tools', itemIndex, '[]'));
+	const functions = parseTools(context.getNodeParameter('tools', itemIndex, '[]'));
+	if (operation === 'toolSelection' && functions.length === 0) {
+		throw new NeedleSchemaError(
+			'Function Call Selection requires at least one function in Functions (JSON).',
+		);
+	}
+	return functions;
 }
 
 function parseTools(value: unknown): NeedleToolDefinition[] {
 	const parsed = typeof value === 'string' ? parseJson(value, 'Tools') : value;
-	if (!Array.isArray(parsed)) throw new NeedleSchemaError('Tools must be a JSON array.');
+	if (!Array.isArray(parsed)) throw new NeedleSchemaError('Functions must be a JSON array.');
 	return parsed.map((entry, index) => {
-		if (!entry || typeof entry !== 'object') throw new NeedleSchemaError(`Tool ${index + 1} must be an object.`);
+		if (!entry || typeof entry !== 'object') throw new NeedleSchemaError(`Function ${index + 1} must be an object.`);
 		const tool = entry as Record<string, unknown>;
 		if (typeof tool.name !== 'string' || !tool.name) {
-			throw new NeedleSchemaError(`Tool ${index + 1} requires a name.`);
+			throw new NeedleSchemaError(`Function ${index + 1} requires a name.`);
 		}
 		return {
 			name: tool.name,
 			description: typeof tool.description === 'string' ? tool.description : undefined,
-			parameters: parseJsonObject(tool.parameters ?? {}, `Tool ${tool.name} parameters`),
+			parameters: parseJsonObject(tool.parameters ?? {}, `Function ${tool.name} parameters`),
 		};
 	});
 }

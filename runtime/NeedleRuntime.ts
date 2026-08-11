@@ -55,6 +55,7 @@ export class NeedleRuntime {
 	private module?: EmscriptenNeedleModule;
 	private functions?: RuntimeFunctions;
 	private activeModelKey?: string;
+	private activeModelPointer?: number;
 	private initializationMs = 0;
 
 	constructor(options: NeedleRuntimeOptions = {}) {
@@ -164,9 +165,15 @@ export class NeedleRuntime {
 			if (result !== 0) {
 				throw new NeedleModelLoadError(`Needle model \`${model.path}\` could not be loaded.`);
 			}
+			// The WASM engine keeps zero-copy views into the CACT buffer. Retain the
+			// allocation for as long as this model is active; otherwise a later malloc
+			// (usually the completion output buffer) can overwrite the model weights.
+			if (this.activeModelPointer !== undefined) module._free(this.activeModelPointer);
+			this.activeModelPointer = pointer;
 			this.activeModelKey = model.key;
-		} finally {
+		} catch (error) {
 			module._free(pointer);
+			throw error;
 		}
 	}
 
@@ -228,7 +235,9 @@ export class NeedleRuntime {
 					? raw.response
 					: typeof raw.content === 'string'
 						? raw.content
-						: undefined,
+						: typeof raw.message === 'string'
+							? raw.message
+							: undefined,
 			confidence: typeof raw.confidence === 'number' ? raw.confidence : 0,
 			metrics: {
 				durationMs,

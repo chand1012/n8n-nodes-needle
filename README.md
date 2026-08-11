@@ -8,12 +8,32 @@ Run [Cactus Needle 2](https://github.com/cactus-compute/needle) locally in n8n. 
 
 The standard workflow node supports:
 
-- Tool Selection
+- Function Call Selection with user-defined function schemas
 - Structured Extraction with JSON Schema
 - Classification with fixed labels
 - Direct completion
 
 Every result includes Needle's confidence score. The node can mark, return, suppress, or throw on a result below the configured threshold. Runtime metrics are optional.
+
+For **Function Call Selection**, define every function that Needle is allowed to call in **Functions (JSON)**. Each entry contains a function name, an optional description, and the JSON Schema for its arguments:
+
+```json
+[
+  {
+    "name": "get_weather",
+    "description": "Get the current weather for a city",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "city": { "type": "string", "description": "City name" }
+      },
+      "required": ["city"]
+    }
+  }
+]
+```
+
+The standalone node returns the selected name and arguments in `functionCalls` on its normal main output. It declares callable functions for Needle; it is not exposed as an AI Agent tool.
 
 ### Needle Chat Model
 

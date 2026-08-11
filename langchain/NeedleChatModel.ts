@@ -65,6 +65,12 @@ export class NeedleChatModel extends BaseChatModel {
 				}))
 			: [];
 		if (response?.response) content.push({ type: 'text', text: response.response });
+		if (response && content.length === 0) {
+			content.push({
+				type: 'text',
+				text: 'Needle could not match the request to any connected tool.',
+			});
+		}
 
 		return {
 			finishReason: response?.functionCalls.length ? 'tool-calls' : 'stop',

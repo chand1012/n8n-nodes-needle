@@ -20,6 +20,8 @@ test('runs bundled Needle 2 through WebAssembly', { timeout: 120_000 }, async ()
 	const result = await session.complete('What is the weather in Lagos?');
 	assert.equal(result.success, true);
 	assert.equal(result.type, 'call');
+	assert.deepEqual(result.functionCalls, [{ name: 'get_weather', arguments: { city: 'Lagos' } }]);
+	assert.ok(result.confidence > 0.8);
 	assert.equal(typeof result.confidence, 'number');
 	assert.equal(typeof result.metrics.prefillTokensPerSecond, 'number');
 	assert.ok(Array.isArray(result.raw.function_calls));
