@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-needle",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Local Cactus Needle 2 tool calling and text classification for n8n",
   "license": "MIT",
   "homepage": "https://github.com/chand1012/n8n-nodes-needle",
