@@ -39,8 +39,7 @@
     "credentials": [],
     "nodes": [
       "dist/nodes/Needle/Needle.node.js",
-      "dist/nodes/NeedleTextClassifier/NeedleTextClassifier.node.js",
-      "dist/nodes/NeedleChatModel/NeedleChatModel.node.js"
+      "dist/nodes/NeedleTextClassifier/NeedleTextClassifier.node.js"
     ]
   },
   "devDependencies": {

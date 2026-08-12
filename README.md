@@ -38,12 +38,6 @@ Enable **Allow Multiple Classes To Be True** to route a copy of the item to ever
 
 Choose **Custom CACT File** to use a model under `N8N_NEEDLE_MODEL_DIRECTORY`. Enable **Include Tool Calls in Output** to attach a portable synthetic-data record containing the input, generated function schemas, returned calls, and confidence. Once tool-call output is enabled, **Include Metrics** can add runtime and throughput measurements to that same record. By default the record is written to `needleClassification`.
 
-### Needle Chat Model
-
-Connect this subnode to an n8n AI Agent through the `AiLanguageModel` connection. LangChain tools are converted to Needle JSON Schema tools, and Needle calls are returned as standard LangChain `AIMessage.tool_calls` for the Agent to execute.
-
-Needle is a compact tool-calling model, not a general conversational LLM. It is best used for local tool routing and local-first escalation workflows.
-
 ## Installation
 
 Install `n8n-nodes-needle` as an n8n community node package, or install it in the custom nodes directory:
