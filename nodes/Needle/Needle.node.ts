@@ -19,8 +19,6 @@ import type {
 	NeedleToolDefinition,
 } from '../../runtime/types';
 
-type NeedleOperation = 'toolSelection' | 'structuredExtraction' | 'classification' | 'complete';
-
 export class Needle implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Needle',
@@ -28,25 +26,12 @@ export class Needle implements INodeType {
 		icon: 'file:needle.svg',
 		group: ['transform'],
 		version: 1,
-		description: 'Run Needle 2 locally as a standalone workflow step',
-		subtitle: '={{$parameter["operation"]}}',
+		description: 'Select function calls locally with Needle 2',
+		subtitle: 'Function Call Selection',
 		defaults: { name: 'Needle' },
 		inputs: [NodeConnectionTypes.Main],
 		outputs: [NodeConnectionTypes.Main],
 		properties: [
-			{
-				displayName: 'Operation',
-				name: 'operation',
-				type: 'options',
-				noDataExpression: true,
-				options: [
-					{ name: 'Classification', value: 'classification', description: 'Choose a label from a fixed list', action: 'Classify text' },
-					{ name: 'Complete', value: 'complete', description: 'Call the underlying Needle completion interface', action: 'Complete a prompt' },
-					{ name: 'Function Call Selection', value: 'toolSelection', description: 'Return one or more function names and arguments to the main workflow output', action: 'Select function calls' },
-					{ name: 'Structured Extraction', value: 'structuredExtraction', description: 'Extract data constrained by JSON Schema', action: 'Extract structured data' },
-				],
-				default: 'toolSelection',
-			},
 			{
 				displayName: 'Model',
 				name: 'modelSource',
@@ -79,30 +64,8 @@ export class Needle implements INodeType {
 				name: 'tools',
 				type: 'json',
 				default: '[]',
+				required: true,
 				description: 'Functions Needle may call. Provide a JSON array where each function has a name, optional description, and a JSON Schema parameters object. Selected calls are returned in functionCalls on the main output.',
-				displayOptions: { show: { operation: ['toolSelection', 'complete'] } },
-			},
-			{
-				displayName: 'JSON Schema',
-				name: 'jsonSchema',
-				type: 'json',
-				default: '{\n  "type": "object",\n  "properties": {},\n  "required": []\n}',
-				displayOptions: { show: { operation: ['structuredExtraction'] } },
-			},
-			{
-				displayName: 'Labels',
-				name: 'labels',
-				type: 'fixedCollection',
-				typeOptions: { multipleValues: true },
-				default: { values: [{ label: '' }] },
-				options: [
-					{
-						displayName: 'Label',
-						name: 'values',
-						values: [{ displayName: 'Label', name: 'label', type: 'string', default: '' }],
-					},
-				],
-				displayOptions: { show: { operation: ['classification'] } },
 			},
 			{
 				displayName: 'System Facts',
@@ -155,13 +118,12 @@ export class Needle implements INodeType {
 
 		for (let itemIndex = 0; itemIndex < inputItems.length; itemIndex++) {
 			try {
-				const operation = this.getNodeParameter('operation', itemIndex) as NeedleOperation;
 				const modelSource = this.getNodeParameter('modelSource', itemIndex) as NeedleModelOptions['source'];
 				const model = await runtime.loadModel({
 					source: modelSource,
 					path: modelSource === 'custom' ? (this.getNodeParameter('modelPath', itemIndex) as string) : undefined,
 				});
-				const tools = buildTools(this, itemIndex, operation);
+				const tools = buildTools(this, itemIndex);
 				const session = await runtime.createSession(model, {
 					tools,
 					system: this.getNodeParameter('system', itemIndex, '') as string,
@@ -198,31 +160,9 @@ export class Needle implements INodeType {
 function buildTools(
 	context: IExecuteFunctions,
 	itemIndex: number,
-	operation: NeedleOperation,
 ): NeedleToolDefinition[] {
-	if (operation === 'structuredExtraction') {
-		const schema = parseJsonObject(context.getNodeParameter('jsonSchema', itemIndex), 'JSON Schema');
-		return [{ name: 'extract', description: 'Extract the requested structured data', parameters: schema }];
-	}
-	if (operation === 'classification') {
-		const labelValue = context.getNodeParameter('labels', itemIndex, {}) as {
-			values?: Array<{ label?: string }>;
-		};
-		const labels = (labelValue.values ?? []).map(({ label }) => label?.trim()).filter(Boolean) as string[];
-		if (labels.length < 2) throw new NeedleSchemaError('Classification requires at least two labels.');
-		return [{
-			name: 'classify',
-			description: 'Classify the input into exactly one label',
-			parameters: {
-				type: 'object',
-				properties: { label: { type: 'string', enum: labels } },
-				required: ['label'],
-				additionalProperties: false,
-			},
-		}];
-	}
 	const functions = parseTools(context.getNodeParameter('tools', itemIndex, '[]'));
-	if (operation === 'toolSelection' && functions.length === 0) {
+	if (functions.length === 0) {
 		throw new NeedleSchemaError(
 			'Function Call Selection requires at least one function in Functions (JSON).',
 		);

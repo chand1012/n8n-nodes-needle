@@ -1,12 +1,12 @@
 {
-	"node": "n8n-nodes-needle.needle",
+	"node": "n8n-nodes-needle.needleTextClassifier",
 	"nodeVersion": "1.0",
 	"codexVersion": "1.0",
 	"categories": ["Data & Storage"],
 	"resources": {
 		"primaryDocumentation": [
 			{
-				"url": "https://github.com/chand1012/n8n-nodes-needle#needle-node"
+				"url": "https://github.com/chand1012/n8n-nodes-needle#needle-text-classifier"
 			}
 		]
 	}

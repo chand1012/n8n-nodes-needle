@@ -1,0 +1,52 @@
+{
+	"id": "needle-classifier-lifecycle-workflow",
+	"name": "Needle Classifier Docker Lifecycle",
+	"nodes": [
+		{
+			"parameters": {},
+			"id": "manual-trigger",
+			"name": "Manual Trigger",
+			"type": "n8n-nodes-base.manualTrigger",
+			"typeVersion": 1,
+			"position": [0, 0]
+		},
+		{
+			"parameters": {
+				"inputText": "What is the weather in Lagos?",
+				"categories": {
+					"categories": [
+						{
+							"category": "Weather",
+							"description": "Questions and requests about weather conditions in a city"
+						},
+						{
+							"category": "Email",
+							"description": "Requests to compose or send an email"
+						}
+					]
+				},
+				"modelSource": "builtIn",
+				"options": {
+					"multiClass": false,
+					"minimumConfidence": 0,
+					"fallback": "other",
+					"includeToolCalls": true,
+					"toolCallsOutputField": "needleClassification",
+					"maxNewTokens": 256
+				}
+			},
+			"id": "needle-classifier",
+			"name": "Needle Text Classifier",
+			"type": "n8n-nodes-needle.needleTextClassifier",
+			"typeVersion": 1,
+			"position": [240, 0]
+		}
+	],
+	"connections": {
+		"Manual Trigger": {
+			"main": [[{"node": "Needle Text Classifier", "type": "main", "index": 0}]]
+		}
+	},
+	"active": false,
+	"settings": {"executionOrder": "v1"}
+}

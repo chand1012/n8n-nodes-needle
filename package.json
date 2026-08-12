@@ -1,7 +1,7 @@
 {
   "name": "n8n-nodes-needle",
   "version": "0.1.1",
-  "description": "Local Cactus Needle 2 tool calling and structured extraction for n8n",
+  "description": "Local Cactus Needle 2 tool calling and text classification for n8n",
   "license": "MIT",
   "homepage": "https://github.com/chand1012/n8n-nodes-needle",
   "keywords": [
@@ -39,6 +39,7 @@
     "credentials": [],
     "nodes": [
       "dist/nodes/Needle/Needle.node.js",
+      "dist/nodes/NeedleTextClassifier/NeedleTextClassifier.node.js",
       "dist/nodes/NeedleChatModel/NeedleChatModel.node.js"
     ]
   },

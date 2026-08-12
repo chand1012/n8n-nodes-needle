@@ -1,0 +1,41 @@
+{
+	"id": "needle-sentiment-lifecycle-workflow",
+	"name": "Needle Sentiment Docker Lifecycle",
+	"nodes": [
+		{
+			"parameters": {},
+			"id": "manual-trigger",
+			"name": "Manual Trigger",
+			"type": "n8n-nodes-base.manualTrigger",
+			"typeVersion": 1,
+			"position": [0, 0]
+		},
+		{
+			"parameters": {
+				"inputText": "I absolutely love this product!",
+				"modelSource": "builtIn",
+				"options": {
+					"categories": "Positive, Neutral, Negative",
+					"includeDetailedResults": true,
+					"includeToolCalls": true,
+					"includeMetrics": true,
+					"minimumConfidence": 0.3,
+					"fallback": "other",
+					"toolCallsOutputField": "needleSentiment"
+				}
+			},
+			"id": "needle-sentiment",
+			"name": "Needle Sentiment Analysis",
+			"type": "n8n-nodes-needle.needleSentimentAnalysis",
+			"typeVersion": 1,
+			"position": [240, 0]
+		}
+	],
+	"connections": {
+		"Manual Trigger": {
+			"main": [[{"node": "Needle Sentiment Analysis", "type": "main", "index": 0}]]
+		}
+	},
+	"active": false,
+	"settings": {"executionOrder": "v1"}
+}
