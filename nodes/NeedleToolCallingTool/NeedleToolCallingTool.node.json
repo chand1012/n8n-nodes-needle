@@ -1,0 +1,17 @@
+{
+	"node": "n8n-nodes-needle.needleToolCallingTool",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["AI"],
+	"subcategories": {
+		"AI": ["Tools"],
+		"Tools": ["Other Tools"]
+	},
+	"resources": {
+		"primaryDocumentation": [
+			{
+				"url": "https://github.com/chand1012/n8n-nodes-needle#needle-tool-calling-tool"
+			}
+		]
+	}
+}

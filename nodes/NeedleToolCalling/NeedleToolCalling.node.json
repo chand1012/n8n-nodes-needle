@@ -1,12 +1,12 @@
 {
-	"node": "n8n-nodes-needle.needleChatModel",
+	"node": "n8n-nodes-needle.needleToolCalling",
 	"nodeVersion": "1.0",
 	"codexVersion": "1.0",
 	"categories": ["AI"],
 	"resources": {
 		"primaryDocumentation": [
 			{
-				"url": "https://github.com/chand1012/n8n-nodes-needle#needle-chat-model"
+				"url": "https://github.com/chand1012/n8n-nodes-needle#needle-tool-calling"
 			}
 		]
 	}

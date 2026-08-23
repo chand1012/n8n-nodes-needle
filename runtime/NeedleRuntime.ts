@@ -88,11 +88,22 @@ export class NeedleRuntime {
 	}
 
 	async execute(session: NeedleSession, inputs: string[]): Promise<NeedleResponse> {
+		return await this.runSession(session, async (complete) => {
+			let response: NeedleResponse | undefined;
+			for (const input of inputs) response = complete(input);
+			if (!response) throw new NeedleInferenceError('Needle did not produce a response.');
+			return response;
+		});
+	}
+
+	async runSession<T>(
+		session: NeedleSession,
+		callback: (complete: (input: string) => NeedleResponse) => Promise<T>,
+	): Promise<T> {
 		return await this.mutex.runExclusive(async () => {
 			await this.initialize();
 			const module = this.requireModule();
 			const functions = this.requireFunctions();
-			const startedAt = performance.now();
 
 			await this.activateModel(session.model, module);
 			const tools = session.options.tools ?? [];
@@ -104,22 +115,28 @@ export class NeedleRuntime {
 			);
 			if (initialized < 0) throw new NeedleInferenceError('Needle session initialization failed.');
 
-			let raw: Record<string, unknown> | undefined;
-			for (const input of inputs) {
-				raw = this.completeInternal(
+			const complete = (input: string): NeedleResponse => {
+				const startedAt = performance.now();
+				const raw = this.completeInternal(
 					input,
 					session.options.maxNewTokens ?? 256,
 					session.options.outputBufferBytes ?? 65_536,
 					module,
 					functions,
 				);
-			}
-			if (!raw) throw new NeedleInferenceError('Needle did not produce a response.');
-
-			const durationMs = performance.now() - startedAt;
-			const response = this.normalizeResponse(raw, durationMs, session.model.loadTimeMs, tools.length);
-			this.log(`inference completed in ${durationMs.toFixed(1)}ms confidence=${response.confidence}`);
-			return response;
+				const durationMs = performance.now() - startedAt;
+				const response = this.normalizeResponse(
+					raw,
+					durationMs,
+					session.model.loadTimeMs,
+					tools.length,
+				);
+				this.log(
+					`inference completed in ${durationMs.toFixed(1)}ms confidence=${response.confidence}`,
+				);
+				return response;
+			};
+			return await callback(complete);
 		});
 	}
 

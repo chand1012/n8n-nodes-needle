@@ -1,7 +1,7 @@
 {
   "name": "n8n-nodes-needle",
   "version": "0.3.0",
-  "description": "Local Cactus Needle 2 tool calling and text classification for n8n",
+  "description": "Local Cactus Needle 2 chained tool calling and text classification for n8n",
   "license": "MIT",
   "homepage": "https://github.com/chand1012/n8n-nodes-needle",
   "keywords": [
@@ -40,10 +40,13 @@
     "nodes": [
       "dist/nodes/Needle/Needle.node.js",
       "dist/nodes/NeedleSentimentAnalysis/NeedleSentimentAnalysis.node.js",
-      "dist/nodes/NeedleTextClassifier/NeedleTextClassifier.node.js"
+      "dist/nodes/NeedleTextClassifier/NeedleTextClassifier.node.js",
+      "dist/nodes/NeedleToolCalling/NeedleToolCalling.node.js",
+      "dist/nodes/NeedleToolCallingTool/NeedleToolCallingTool.node.js"
     ]
   },
   "devDependencies": {
+    "@langchain/core": "1.1.41",
     "@n8n/ai-node-sdk": "0.14.1",
     "@n8n/node-cli": "0.33.1",
     "eslint": "9.29.0",
@@ -53,6 +56,7 @@
     "typescript": "5.9.3"
   },
   "peerDependencies": {
+    "@langchain/core": "*",
     "@n8n/ai-node-sdk": "*",
     "n8n-workflow": "*"
   }

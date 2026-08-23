@@ -31,6 +31,34 @@ test('runs bundled Needle 2 through WebAssembly', { timeout: 120_000 }, async ()
 	assert.ok(Array.isArray(result.raw.function_calls));
 });
 
+test('keeps one WASM session active across chained completions', { timeout: 120_000 }, async () => {
+	const runtime = new NeedleRuntime();
+	const model = await runtime.loadModel({ source: 'builtIn' });
+	const session = await runtime.createSession(model, {
+		tools: [{
+			name: 'get_weather',
+			description: 'Get the current weather for a city',
+			parameters: {
+				type: 'object',
+				properties: { city: { type: 'string' } },
+				required: ['city'],
+			},
+		}],
+	});
+
+	const responses = await session.run(async (complete) => [
+		complete('What is the weather in Lagos?'),
+		complete('[{"city":"Lagos","temp_c":27}]'),
+	]);
+
+	assert.equal(responses[0].type, 'call');
+	assert.deepEqual(responses[0].functionCalls[0], {
+		name: 'get_weather',
+		arguments: { city: 'Lagos' },
+	});
+	assert.equal(responses[1].functionCalls.length, 0);
+});
+
 test('runs the Needle website sentiment method through bundled WebAssembly', { timeout: 120_000 }, async () => {
 	const runtime = new NeedleRuntime();
 	const model = await runtime.loadModel({ source: 'builtIn' });

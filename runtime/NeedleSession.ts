@@ -16,4 +16,10 @@ export class NeedleSession {
 		if (inputs.length === 0) throw new Error('A Needle session requires at least one input.');
 		return await this.runtime.execute(this, inputs);
 	}
+
+	async run<T>(
+		callback: (complete: (input: string) => NeedleResponse) => Promise<T>,
+	): Promise<T> {
+		return await this.runtime.runSession(this, callback);
+	}
 }

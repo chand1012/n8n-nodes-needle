@@ -57,4 +57,42 @@ export interface NeedleResponse {
 	raw: Record<string, unknown>;
 }
 
+export type NeedleSerializableValue =
+	| string
+	| number
+	| boolean
+	| null
+	| NeedleSerializableValue[]
+	| { [key: string]: NeedleSerializableValue };
+
+export type NeedleChainStopReason = 'completed' | 'lowConfidence' | 'maxSteps';
+
+export interface NeedleExecutedToolCall extends NeedleFunctionCall {
+	result: NeedleSerializableValue;
+}
+
+export interface NeedleChainRound {
+	step: number;
+	input: string;
+	response: NeedleResponse;
+	executions: NeedleExecutedToolCall[];
+}
+
+export interface NeedleChainExecution {
+	query: string;
+	definedTools: NeedleToolDefinition[];
+	results: NeedleSerializableValue[];
+	rounds: NeedleChainRound[];
+	finalResponse: NeedleResponse;
+	stopReason: NeedleChainStopReason;
+}
+
+export interface NeedleChainOptions {
+	model: NeedleModelOptions;
+	system?: string;
+	minimumConfidence?: number;
+	maxSteps?: number;
+	maxNewTokens?: number;
+}
+
 export type LowConfidenceBehavior = 'returnNormally' | 'markLowConfidence' | 'returnEmpty' | 'throwError';

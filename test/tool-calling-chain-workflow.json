@@ -1,0 +1,62 @@
+{
+	"id": "needle-tool-calling-chain-workflow",
+	"name": "Needle Dependent Tool Chain",
+	"nodes": [
+		{
+			"parameters": {
+				"description": "Create a new photo album and return its numeric album ID.",
+				"language": "javaScript",
+				"jsCode": "return JSON.stringify({ albumId: 42, name: query.name });",
+				"specifyInputSchema": true,
+				"schemaType": "manual",
+				"inputSchema": "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"}},\"required\":[\"name\"]}"
+			},
+			"id": "create-album-tool",
+			"name": "create_album",
+			"type": "@n8n/n8n-nodes-langchain.toolCode",
+			"typeVersion": 1.3,
+			"position": [0, -120]
+		},
+		{
+			"parameters": {
+				"description": "Move matching photos into an existing album using its numeric ID.",
+				"language": "javaScript",
+				"jsCode": "return JSON.stringify({ albumId: query.albumId, filter: query.filter, moved: 8 });",
+				"specifyInputSchema": true,
+				"schemaType": "manual",
+				"inputSchema": "{\"type\":\"object\",\"properties\":{\"albumId\":{\"type\":\"number\"},\"filter\":{\"type\":\"string\"}},\"required\":[\"albumId\",\"filter\"]}"
+			},
+			"id": "move-photos-tool",
+			"name": "move_photos",
+			"type": "@n8n/n8n-nodes-langchain.toolCode",
+			"typeVersion": 1.3,
+			"position": [0, 120]
+		},
+		{
+			"parameters": {
+				"prompt": "Create an album called Summer 2026 and move the photos from last weekend into it.",
+				"modelSource": "builtIn",
+				"minimumConfidence": 0,
+				"maxSteps": 8,
+				"maxNewTokens": 256,
+				"includeMetrics": true,
+				"detailedOutput": true
+			},
+			"id": "needle-tool-calling",
+			"name": "Needle Tool Calling",
+			"type": "n8n-nodes-needle.needleToolCalling",
+			"typeVersion": 1,
+			"position": [300, 0]
+		}
+	],
+	"connections": {
+		"create_album": {
+			"ai_tool": [[{"node": "Needle Tool Calling", "type": "ai_tool", "index": 0}]]
+		},
+		"move_photos": {
+			"ai_tool": [[{"node": "Needle Tool Calling", "type": "ai_tool", "index": 0}]]
+		}
+	},
+	"active": false,
+	"settings": {"executionOrder": "v1"}
+}
