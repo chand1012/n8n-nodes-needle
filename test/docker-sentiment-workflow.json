@@ -13,15 +13,8 @@
 		{
 			"parameters": {
 				"inputText": "I absolutely love this product!",
-				"modelSource": "builtIn",
 				"options": {
-					"categories": "Positive, Neutral, Negative",
-					"includeDetailedResults": true,
-					"includeToolCalls": true,
-					"includeMetrics": true,
-					"minimumConfidence": 0.3,
-					"fallback": "other",
-					"toolCallsOutputField": "needleSentiment"
+					"includeDetailedResults": true
 				}
 			},
 			"id": "needle-sentiment",

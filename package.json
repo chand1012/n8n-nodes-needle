@@ -39,6 +39,7 @@
     "credentials": [],
     "nodes": [
       "dist/nodes/Needle/Needle.node.js",
+      "dist/nodes/NeedleSentimentAnalysis/NeedleSentimentAnalysis.node.js",
       "dist/nodes/NeedleTextClassifier/NeedleTextClassifier.node.js"
     ]
   },

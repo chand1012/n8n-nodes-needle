@@ -38,6 +38,12 @@ Enable **Allow Multiple Classes To Be True** to route a copy of the item to ever
 
 Choose **Custom CACT File** to use a model under `N8N_NEEDLE_MODEL_DIRECTORY`. Enable **Include Tool Calls in Output** to attach a portable synthetic-data record containing the input, generated function schemas, returned calls, and confidence. Once tool-call output is enabled, **Include Metrics** can add runtime and throughput measurements to that same record. By default the record is written to `needleClassification`.
 
+### Needle Sentiment Analysis
+
+The sentiment node analyzes text entirely through the bundled Needle 2 model and routes each item to a **Positive**, **Neutral**, or **Negative** output. It uses Needle's native `classify_sentiment` example schema, which grammar-constrains the model to `positive`, `negative`, `neutral`, or `mixed`; both `neutral` and `mixed` are routed to the **Neutral** output.
+
+The original item is preserved and receives a `sentimentAnalysis.category` field containing the routed category. Enable **Include Detailed Results** to also add `sentimentAnalysis.confidence` and `sentimentAnalysis.strength`; both use Needle's learned confidence score because Needle does not produce a separate sentiment-strength value. No AI model subnode, API key, or network request is required.
+
 ## Installation
 
 Install `n8n-nodes-needle` as an n8n community node package, or install it in the custom nodes directory:
