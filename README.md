@@ -4,11 +4,45 @@ Run [Cactus Needle 2](https://github.com/cactus-compute/needle) locally in n8n. 
 
 ## Nodes
 
+| Node | Use it when | Inputs | Outputs |
+| --- | --- | --- | --- |
+| **Needle** | You already have function schemas and want Needle to select calls without executing them | Main | Main |
+| **Needle Tool Calling** | A workflow should let Needle select and execute connected n8n or MCP tools | Main, required Tools | Main |
+| **Needle Tool Calling Tool** | An n8n Agent should delegate tool selection and execution to Needle | Required Tools | Tool |
+| **Needle Text Classifier** | Items need to be routed into user-defined category branches | Main | One branch per category, plus optional Other |
+| **Needle Sentiment Analysis** | Items need to be routed by positive, neutral, or negative sentiment | Main | Positive, Neutral, Negative |
+
 ### Needle
 
-The standard workflow node supports function call selection with user-defined function schemas. It accepts a prompt and an explicit list of callable functions, then returns Needle's selected function names and arguments on its normal workflow output.
+The **Needle** node performs schema-constrained function call selection. It tells you which functions Needle would call and with which arguments, but it does not execute those functions. Use **Needle Tool Calling** instead when the functions are real n8n tools that should run.
 
-Every result includes Needle's confidence score. The node can mark, return, suppress, or throw on a result below the configured threshold. Runtime metrics are optional.
+#### Connections
+
+- **Main input:** Processes every incoming item independently. Expressions in **Prompt**, **Functions (JSON)**, and other fields are evaluated for that item.
+- **Main output:** Returns one result for each input item and preserves n8n item pairing.
+
+#### Parameters
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| **Model** | Built-In Needle 2 | Uses the bundled model or a custom `.cact` model. |
+| **Custom Model Path** | Empty | Absolute path under `N8N_NEEDLE_MODEL_DIRECTORY`. Only shown for a custom model. |
+| **Prompt** | `={{ $json.message }}` | Request from which Needle extracts function calls. Plain text and expressions are supported. |
+| **Functions (JSON)** | `[]` | Required array of allowed function definitions. At least one function is required. |
+| **System Facts** | Empty | Optional facts such as the date, locale, device, or user. Plain text and expressions are supported. |
+| **Minimum Confidence** | `0.8` | Score below which the selected **Below Threshold** policy applies. |
+| **Below Threshold** | Mark Low Confidence | Controls whether a low-confidence result is marked, returned unchanged, replaced with an empty item, or raised as an error. |
+| **Include Metrics** | Off | Adds local runtime, model-load, throughput, and tool-count metrics. |
+| **Max New Tokens** | `256` | Maximum tokens Needle may generate, from 1 to 2048. |
+
+The four low-confidence policies are:
+
+- **Mark Low Confidence:** Return the response with `belowThreshold: true`.
+- **Return Empty:** Return an empty JSON item.
+- **Return Normally:** Return the native response without adding a low-confidence marker.
+- **Throw Error:** Stop the node with a confidence error. This can still be handled with n8n's **Continue On Fail** setting.
+
+#### Function schema format
 
 For **Function Call Selection**, define every function that Needle is allowed to call in **Functions (JSON)**. Each entry contains a function name, an optional description, and the JSON Schema for its arguments:
 
@@ -28,26 +62,105 @@ For **Function Call Selection**, define every function that Needle is allowed to
 ]
 ```
 
-The standalone node returns the selected name and arguments in `functionCalls` on its normal main output. It declares callable functions for Needle; it is not exposed as an AI Agent tool.
+Names must be non-empty and `parameters` must be a JSON object. Nested properties, enums, required fields, descriptions, and other JSON Schema constraints are passed to Needle.
+
+#### Output
+
+```json
+{
+  "type": "call",
+  "success": true,
+  "error": null,
+  "errorCode": null,
+  "functionCalls": [
+    {
+      "name": "get_weather",
+      "arguments": { "city": "Boston" }
+    }
+  ],
+  "reasoning": "The user requested current weather for Boston.",
+  "confidence": 0.96,
+  "belowThreshold": false
+}
+```
+
+`response` is included when Needle returns natural-language content. `metrics` is included only when enabled. This node declares functions for selection only; it is not an AI Agent tool and has no Tools connector.
 
 ### Needle Tool Calling
 
-The **Needle Tool Calling** node turns the AI tools connected to its **Tools** input into Needle schemas, plans one or more calls, executes them, and feeds each ordered result batch back into the same local Needle session. This supports dependent chains such as creating a record first and using its returned ID in a later tool call. Connect any ordinary n8n AI Tool or MCP tool that an Agent could use; toolkits are expanded into their individual tools.
+The **Needle Tool Calling** node converts connected AI tools into Needle schemas, asks Needle which calls are needed, and executes the selected calls locally through n8n. Its default one-step behavior matches the Needle homepage: one inference may select an ordered batch of multiple calls, every call in that batch runs serially, and the node returns the compiled results without an extra inference.
 
-The node accepts normal workflow items on its main input and evaluates its configured **Prompt** for each item, so expressions can reference upstream data. Its main output always includes:
+Increase **Max Steps** only for a dependent chain in which a later inference needs the result of an earlier batch, such as creating a record and then using its returned ID.
+
+#### Connections
+
+- **Main input:** Processes every incoming item. This lets the prompt and settings reference upstream JSON with expressions.
+- **Tools input:** Required AI Tool connection. Any number of ordinary n8n tools, MCP tools, or toolkits may be connected.
+- **Main output:** Returns the Needle response, generated tool schemas, and ordered execution results.
+
+#### Parameters
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| **Prompt** | Empty | Required request to complete with the connected tools. Plain text and expressions are supported. |
+| **Model** | Built-In Needle 2 | Uses the bundled model or a custom `.cact` model. |
+| **Custom Model Path** | Empty | Absolute path under `N8N_NEEDLE_MODEL_DIRECTORY`. Only shown for a custom model. |
+| **System Facts** | Empty | Optional date, locale, device, user, or other context. Plain text and expressions are supported. |
+| **Minimum Confidence** | `0.8` | Stops before side effects when a selected call batch is below this score. |
+
+Advanced controls are hidden under **Options**:
+
+| Option | Default | Description |
+| --- | --- | --- |
+| **Max Steps** | `1` | Number of tool-call batches Needle may execute, from 1 to 32. A value of 1 still permits multiple calls in the first batch. |
+| **Max New Tokens** | `256` | Maximum tokens generated during each Needle inference, from 1 to 2048. |
+| **Include Metrics** | Off | Adds metrics to response envelopes. |
+| **Detailed Output** | Off | Adds the original query and a complete ordered trace of inference rounds and tool executions. |
+
+#### Connected tool conversion
+
+- Structured Zod and JSON Schema tools retain their argument constraints and descriptions.
+- Schema-less string tools receive a required `input` string property.
+- Toolkits, including MCP tool collections, are expanded into individual tools.
+- Every tool must be callable and have a non-empty, unique name.
+- Invalid schemas and duplicate names fail before inference, so no connected tool is executed.
+- Tool results must be JSON-serializable. JSON strings are parsed; other strings are preserved as strings.
+
+#### Execution and safety behavior
+
+Calls returned in the same batch execute serially in model order. A low-confidence batch stops before any call in that batch is run. An unknown tool, invalid arguments, invocation error, `undefined` result, or non-serializable result stops immediately with the step, call number, and tool name in the error.
+
+With **Max Steps** above 1, the ordered JSON result array from a completed batch is sent back to the same Needle session. If Needle requests another batch after the configured execution limit, that batch is not executed and `stopReason` is `maxSteps`.
+
+#### Default output
+
+Every output includes:
 
 - Needle's final response envelope.
 - `definedTools`, containing the exact generated schemas for copying into a fine-tuning dataset.
 - `results`, containing every successful tool result in execution order.
 - `stopReason`, which is `completed`, `lowConfidence`, or `maxSteps`.
 
-Needle executes calls in model order. A call batch below **Minimum Confidence** is returned without executing any call in that batch. Tool errors stop the node immediately. Advanced controls are hidden under **Options**: **Max Steps** defaults to 1, **Max New Tokens** to 256, and metrics and detailed output are disabled. Increase Max Steps only when later calls must consume earlier tool results through additional Needle rounds. Enable **Detailed Output** to add the original query and every model round with its calls, arguments, results, reasoning, confidence, and optional metrics.
-
 ```json
 {
-  "type": "respond",
+  "type": "call",
   "success": true,
-  "functionCalls": [],
+  "error": null,
+  "errorCode": null,
+  "functionCalls": [
+    {
+      "name": "create_album",
+      "arguments": { "name": "Summer 2026" }
+    },
+    {
+      "name": "move_photos",
+      "arguments": {
+        "album": "Summer 2026",
+        "filter": "last weekend"
+      }
+    }
+  ],
+  "reasoning": "Create the album, then move the requested photos.",
   "confidence": 0.97,
   "definedTools": [
     {
@@ -58,6 +171,18 @@ Needle executes calls in model order. A call batch below **Minimum Confidence** 
         "properties": { "name": { "type": "string" } },
         "required": ["name"]
       }
+    },
+    {
+      "name": "move_photos",
+      "description": "Move matching photos into an album",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "album": { "type": "string" },
+          "filter": { "type": "string" }
+        },
+        "required": ["album", "filter"]
+      }
     }
   ],
   "results": [{ "albumId": 42 }, { "moved": 8 }],
@@ -65,27 +190,158 @@ Needle executes calls in model order. A call batch below **Minimum Confidence** 
 }
 ```
 
-Human-approval/HITL-gated tools are not supported inside the nested Needle loop in this release. Keep those tools directly connected to an n8n Agent so the Agent can surface the approval flow.
+The top-level envelope uses the repository's camelCase field names: `errorCode`, `functionCalls`, and `belowThreshold`. `belowThreshold` appears on a low-confidence response. `metrics` appears only when enabled.
+
+With **Detailed Output**, the node also returns `query`, `finalResponse`, and `rounds`. Each round contains `step`, the exact `input` sent to Needle, the model `response`, and `executions`; every execution associates a tool `name` and `arguments` with its `result`.
+
+#### Copying schemas for training
+
+Run the node once with the intended tools connected and copy `definedTools` from its execution output. This is the exact normalized schema array Needle received at runtime, including schemas generated from MCP and Zod tools, so it can be used when preparing a fine-tuning dataset.
+
+#### Limitations
+
+Human-approval/HITL-gated tools are not supported inside the nested Needle loop in this release. Keep those tools directly connected to an n8n Agent so the Agent can surface the approval flow. Because the Needle WASM runtime has process-global session state, chained runs are serialized; a high step limit can therefore delay concurrent executions.
 
 ### Needle Tool Calling Tool
 
-The **Needle Tool Calling Tool** exposes the same orchestrator as one AI Tool for a parent n8n Agent. Connect the tools Needle may use to its **Tools** input, then connect its **Tool** output to the Agent. Its shared Needle settings are identical to the standalone node, including expression support for **Prompt**, **System Facts**, model settings, confidence, and advanced options. For **Prompt**, you can also click the sparkle button and choose **Let the model define this parameter**. When AI filling is enabled, its configured name and description become the Agent-facing tool schema; fixed prompts are not exposed as Agent arguments. **Tool Name** and **Tool Description** remain fixed because they define how the parent Agent discovers the tool.
+The **Needle Tool Calling Tool** wraps the same tool adapter, orchestrator, options, safety checks, output formatter, and chained execution behavior as **Needle Tool Calling**, but supplies them as a single tool to a parent n8n Agent. It is useful when the Agent's chat model should make one simple delegation call and Needle should perform the schema-constrained tool selection.
 
-Use **Tool Name** and **Tool Description** to tell the parent Agent when to delegate. Each invocation and result is recorded in n8n's AI execution data, and the returned JSON uses the same output contract as the standalone Needle Tool Calling node.
+#### Connections
+
+- **Tools input:** Required. Connect every n8n or MCP tool that Needle may execute.
+- **Tool output:** Connect to the **Tool** input of an n8n Agent.
+- There is no main workflow connection in normal Agent use. n8n invokes the supplied LangChain tool when the parent Agent selects it.
+
+#### Parameters
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| **Tool Name** | `needle_tool_calling` | Fixed alphanumeric name exposed to the parent Agent. Expressions and AI filling are intentionally disabled. |
+| **Tool Description** | Plan and execute one or more connected tools for the supplied prompt. | Fixed instructions telling the parent Agent when to delegate. Expressions and AI filling are intentionally disabled. |
+| **Prompt** | Empty | Request Needle will execute. It may be fixed text, an n8n expression, or a string field filled by the parent Agent. |
+| **Model** | Built-In Needle 2 | Uses the bundled model or a custom `.cact` model. |
+| **Custom Model Path** | Empty | Absolute path under `N8N_NEEDLE_MODEL_DIRECTORY`. |
+| **System Facts** | Empty | Optional context. Like the standalone node, it accepts either a plain string or an expression. |
+| **Minimum Confidence** | `0.8` | Stops before executing a low-confidence call batch. |
+
+The **Options** collection is identical to the standalone node: **Max Steps** defaults to 1, **Max New Tokens** defaults to 256, and **Include Metrics** and **Detailed Output** default to off. The parent Agent cannot override these settings.
+
+#### Configuring the Agent input
+
+The Prompt field follows the same n8n experience as other Agent tools:
+
+1. Enter fixed text or an expression when every invocation should use a prompt determined by the workflow.
+2. Click the sparkle beside **Prompt** and choose **Let the model define this parameter** when the parent Agent should generate it.
+3. Set the AI-filled field's name and description so the parent Agent knows what string to provide.
+
+When Prompt is fixed, the Agent sees a parameterless tool and Needle uses the configured value. When Prompt is AI-filled, the Agent sees exactly one required string property with the configured name and description. Extra bookkeeping fields from n8n are ignored before strict schema validation.
+
+#### Invocation output and observability
+
+The tool returns the same default or detailed result structure as **Needle Tool Calling**, serialized as a JSON string for the parent Agent. Every invocation prompt, output, and error is recorded through n8n's AI tool execution hooks, so the nested run remains visible in execution data.
+
+All connected-tool conversion rules, confidence safeguards, step behavior, serialization requirements, MCP compatibility, and HITL limitations documented for **Needle Tool Calling** also apply here.
 
 ### Needle Text Classifier
 
-The classifier accepts the same core workflow inputs as n8n's Text Classifier: text plus a user-defined list of category names and descriptions. Each category becomes a named main output branch. Needle receives one `classify(text, category)` function whose `category` argument is a grammar-constrained JSON Schema enum—the direct equivalent of Python's `Literal[...]` or `Annotated[str, needle.Field(enum=...)]`. The function description includes every category and its description, and the original item is routed according to the selected literal; no AI model subnode is required.
+The **Needle Text Classifier** routes items into categories you define. Each category becomes a named main output. Internally, Needle receives one `classify(text, category)` function whose `category` property is constrained to a JSON Schema enum, and the function description includes every category description.
 
-Enable **Allow Multiple Classes To Be True** to route a copy of the item to every selected category branch. **Minimum Confidence** controls when a result counts as a clear match. A result below the threshold, or a result with no category call, can either be discarded or sent through an extra **Other** branch.
+#### Connections and routing
 
-Choose **Custom CACT File** to use a model under `N8N_NEEDLE_MODEL_DIRECTORY`. Enable **Include Tool Calls in Output** to attach a portable synthetic-data record containing the input, generated function schemas, returned calls, and confidence. Once tool-call output is enabled, **Include Metrics** can add runtime and throughput measurements to that same record. By default the record is written to `needleClassification`.
+- **Main input:** Processes every incoming item independently.
+- **Category outputs:** One dynamic main output is created for each configured category, in the same order as the category list.
+- **Other output:** Added only when **When No Clear Match** is set to the extra Other branch.
+
+The original JSON and binary data are preserved. In multi-class mode, independent copies of the item are sent to every selected category output.
+
+#### Parameters
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| **Text to Classify** | Empty | Required text. Static text and expressions are supported. |
+| **Categories** | Empty | Required list of category names and optional descriptions. At least one non-empty category is required. |
+| **Model** | Built-In Needle 2 | Uses the bundled model or a custom `.cact` model. |
+| **Custom Model Path** | Empty | Absolute path under `N8N_NEEDLE_MODEL_DIRECTORY`. |
+
+Classifier controls are under **Options**:
+
+| Option | Default | Description |
+| --- | --- | --- |
+| **Allow Multiple Classes To Be True** | Off | Allows Needle to select more than one category and route a copy to every match. |
+| **Include Tool Calls in Output** | Off | Adds a portable synthetic-data record to each routed item. |
+| **Include Metrics** | Off | Adds metrics to that synthetic-data record. Only available when tool-call output is enabled. |
+| **Max New Tokens** | `256` | Maximum generated tokens, from 1 to 2048. |
+| **Minimum Confidence** | `0.3` | Treats lower-confidence results as no clear match. |
+| **Tool Calls Output Field** | `needleClassification` | JSON field that receives the synthetic-data record. |
+| **When No Clear Match** | Discard Item | Drops the item or routes it through an additional **Other** output. |
+
+#### Optional synthetic-data record
+
+With **Include Tool Calls in Output** enabled, the configured field contains:
+
+```json
+{
+  "input": "The customer wants a refund",
+  "tools": [
+    {
+      "name": "classify",
+      "description": "Classifies text into a category...",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "text": { "type": "string" },
+          "category": {
+            "type": "string",
+            "enum": ["Billing", "Technical Support"]
+          }
+        },
+        "required": ["text", "category"],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "toolCalls": [
+    {
+      "name": "classify",
+      "arguments": {
+        "text": "The customer wants a refund",
+        "category": "Billing"
+      }
+    }
+  ],
+  "confidence": 0.94,
+  "belowThreshold": false
+}
+```
+
+`metrics` is added to this record only when enabled. The record is designed for inspecting the exact schema and call or collecting synthetic training data; normal branch routing works without it.
 
 ### Needle Sentiment Analysis
 
-The sentiment node analyzes text entirely through the bundled Needle 2 model and routes each item to a **Positive**, **Neutral**, or **Negative** output. It uses Needle's native `classify_sentiment` example schema, which grammar-constrains the model to `positive`, `negative`, `neutral`, or `mixed`; both `neutral` and `mixed` are routed to the **Neutral** output.
+The **Needle Sentiment Analysis** node analyzes text with the bundled Needle 2 model and routes each item to one of three fixed outputs. It uses Needle's native `classify_sentiment` schema, constrained to `positive`, `negative`, `neutral`, or `mixed`; both `neutral` and `mixed` route to **Neutral**.
 
-The original item is preserved and receives a `sentimentAnalysis.category` field containing the routed category. Enable **Include Detailed Results** to also add `sentimentAnalysis.confidence` and `sentimentAnalysis.strength`; both use Needle's learned confidence score because Needle does not produce a separate sentiment-strength value. No AI model subnode, API key, or network request is required.
+#### Connections and parameters
+
+- **Main input:** Processes every incoming item independently.
+- **Positive**, **Neutral**, and **Negative** outputs: Receive the original item on the selected branch.
+- **Text to Analyze:** Required static text or expression.
+- **Options → Include Detailed Results:** Off by default. Adds confidence estimates to the result.
+
+This node always uses the built-in model and does not require a chat model, API key, Tools connection, or custom model path.
+
+#### Output
+
+The routed item preserves its original JSON and binary data and adds:
+
+```json
+{
+  "sentimentAnalysis": {
+    "category": "Positive"
+  }
+}
+```
+
+With detailed results enabled, it also includes `sentimentAnalysis.confidence` and `sentimentAnalysis.strength`. Both currently use Needle's learned confidence score because Needle does not produce a separate sentiment-strength value. These values are model-generated estimates and should be treated as rough indicators, not statistically rigorous measurements.
 
 ## Installation
 
